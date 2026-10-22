@@ -1,116 +1,131 @@
 import os
-import sys
 import json
 import random
-import urllib.parse
+import math
 import requests
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
-# 1. إعداد الاتصال المباشر بـ Gemini REST API (مضمون 100% بدون مشاكل مكتبات)
+# 1. الاتصال بـ Gemini API مع تشخيص دقيق
 api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-if not api_key:
-    print("❌ خطأ: مفتاح GEMINI_API_KEY غير موجود في GitHub Secrets!")
-    sys.exit(1)
 
 topics = [
-    "أداة ذكاء اصطناعي مجانية توفر ساعات من العمل",
-    "فكرة أتمتة ذكية لربط الواتساب وجداول البيانات لأصحاب المشاريع",
-    "قاعدة ذهبية في هندسة الأوامر (Prompt Engineering) للحصول على نتائج احترافية",
-    "كيف تقلل تكاليف التشغيل في مشروعك باستخدام وكلاء الذكاء الاصطناعي",
-    "خطأ شائع يقع فيه رواد الأعمال عند استخدام الذكاء الاصطناعي وكيفية تجنبه"
+    "3 أدوات ذكاء اصطناعي مجانية تضاعف إنتاجية رواد الأعمال",
+    "كيف تربط واتساب بجدول بيانات جوجل للرد التلقائي على العملاء",
+    "السر وراء كتابة أوامر (Prompts) احترافية تعطيك نتائج دقيقة من أول مرة",
+    "كيف توفر 15 ساعة أسبوعياً عبر أتمتة المهام المتكررة في مشروعك",
+    "لماذا تحتاج الشركات الناشئة إلى وكيل ذكاء اصطناعي (AI Agent) في 2026؟"
 ]
 selected_topic = random.choice(topics)
 
-prompt = f"""
-أنت المدير الإبداعي لعلامة (مَداميك | MdaMiak) المتخصصة في الأتمتة، وكلاء الذكاء الاصطناعي، والحلول الرقمية للأعمال.
-اكتب منشوراً جديداً ومبتكراً لفيسبوك وانستجرام حول هذا الموضوع تحديداً: ({selected_topic}).
-أخرج النتيجة بصيغة JSON فقط بدون أي نص إضافي، تحتوي على المفاتيح التالية:
+prompt = f"""أنت المدير الإبداعي لعلامة (مَداميك | MdaMiak) المتخصصة في الأتمتة، وكلاء الذكاء الاصطناعي، والحلول الرقمية.
+اكتب منشوراً احترافياً وجذاباً لفيسبوك وانستجرام حول: ({selected_topic}).
+أرجع النتيجة بصيغة JSON فقط تحتوي على مفتاحين:
 {{
-  "headline": "عنوان عربي قوي وخاطف للانتباه بدون تشكيل (من 5 إلى 7 كلمات فقط)",
-  "caption": "نص المنشور الكامل بأسلوب احترافي مع نقاط واضحة وسؤال تفاعلي في النهاية والهاشتاجات المناسبة",
-  "image_prompt": "Futuristic luxury dark navy and cyan 3D isometric technology background, glowing digital nodes and abstract geometric blocks, sleek minimalist corporate style, 8k, no text"
-}}
-"""
+  "headline": "عنوان عربي قوي وخاطف للانتباه بدون تشكيل من 5 إلى 7 كلمات",
+  "caption": "نص المنشور الكامل بأسلوب شيق مع نقاط واضحة وسؤال تفاعلي في النهاية والهاشتاجات"
+}}"""
 
-print("1. جاري توليد فكرة ونص المنشور عبر Gemini...")
+print("1. جاري الاتصال بـ Gemini...")
 data = None
-models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+error_logs = []
+
+# قائمة النماذج المعتمدة من الأحدث للأقدم
+models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-pro"]
 
 for model_name in models:
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json"}
-        }
-        res = requests.post(url, json=payload, timeout=30)
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        res = requests.post(url, json=payload, timeout=15)
         if res.status_code == 200:
-            res_json = res.json()
-            raw_text = res_json["candidates"][0]["content"]["parts"][0]["text"].strip()
+            raw_text = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
             if "```" in raw_text:
                 raw_text = raw_text.split("```")[1]
-                if raw_text.startswith("json"):
+                if raw_text.lower().startswith("json"):
                     raw_text = raw_text[4:]
-            data = json.loads(raw_text.strip())
-            print(f"✅ تم التوليد بنجاح عبر نموذج: {model_name}")
-            break
+            start_idx = raw_text.find("{")
+            end_idx = raw_text.rfind("}") + 1
+            if start_idx != -1 and end_idx != 0:
+                data = json.loads(raw_text[start_idx:end_idx])
+                print(f"✅ نجح التوليد عبر: {model_name}")
+                break
         else:
-            print(f"⚠️ استجابة غير متوقعة من {model_name}: {res.status_code} - {res.text}")
+            error_logs.append(f"{model_name}: {res.status_code} -> {res.text[:180]}")
     except Exception as e:
-        print(f"⚠️ خطأ أثناء الاتصال بـ {model_name}: {e}")
+        error_logs.append(f"{model_name} Exception: {str(e)}")
 
 if not data:
-    print("⚠️ تم استخدام المحتوى الاحتياطي نظراً لتعذر الاتصال بـ Gemini.")
+    debug_info = "\n".join(error_logs)
     data = {
         "headline": "أتمتة المهام: سلاحك السري لمضاعفة أرباحك",
-        "caption": "في مَداميك | MdaMiak نحول المهام اليومية المتكررة إلى أنظمة ذكية تعمل تلقائياً بدقة وسرعة.\n\n🔹 توفير 70% من وقت الفريق\n🔹 تقليل الأخطاء البشرية إلى الصفر\n🔹 خدمة عملاء فورية على مدار الساعة\n\nما هي المهمة التي تستهلك معظم وقتك حالياً؟ شاركنا في التعليقات! 👇\n\n#مداميك #MdaMiak #ذكاء_اصطناعي #أتمتة_الأعمال",
-        "image_prompt": "Futuristic luxury dark tech background glowing cyan geometric blocks"
+        "caption": (
+            "في مَداميك | MdaMiak نحول المهام اليومية المتكررة إلى أنظمة ذكية تعمل تلقائياً بدقة وسرعة.\n\n"
+            "🔹 توفير 70% من وقت الفريق\n"
+            "🔹 تقليل الأخطاء البشرية إلى الصفر\n"
+            "🔹 خدمة عملاء فورية على مدار الساعة\n\n"
+            "ما هي المهمة التي تستهلك معظم وقتك حالياً؟ شاركنا في التعليقات! 👇\n\n"
+            "#مداميك #MdaMiak #ذكاء_اصطناعي #أتمتة_الأعمال\n\n"
+            f"--- [تشخيص الاتصال التقني بـ Gemini] ---\n{debug_info}"
+        )
     }
 
 headline = data.get("headline", "حلول الأتمتة الذكية من مداميك")
 caption = data.get("caption", "")
-image_prompt = data.get("image_prompt", "Futuristic dark tech background")
 
-# 2. توليد الخلفية البصرية مع قص ديناميكي يملأ الشاشة بالكامل ويزيل العلامة المائية
-print("2. جاري توليد الخلفية البصرية...")
-bg_image = None
-try:
-    seed = random.randint(1000, 999999)
-    encoded_prompt = urllib.parse.quote(image_prompt)
-    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1080&height=1080&nologo=true&seed={seed}"
-    img_response = requests.get(image_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=45)
-    if img_response.status_code == 200 and len(img_response.content) > 1000:
-        raw_img = Image.open(BytesIO(img_response.content)).convert("RGBA")
-        w, h = raw_img.size
-        # قص 8% من الحواف चारों لإزالة أي شعار مائي مهما كان مقاس الصورة الأصلي ثم تكبيرها لـ 1080x1080
-        margin_w, margin_h = int(w * 0.08), int(h * 0.08)
-        bg_image = raw_img.crop((margin_w, margin_h, w - margin_w, h - margin_h)).resize((1080, 1080), Image.Resampling.LANCZOS)
-        print("✅ تم توليد الخلفية وملء الأبعاد بالكامل بدون علامة مائية!")
-except Exception as e:
-    print(f"⚠️ تعذر جلب الصورة الخارجية: {e}")
+# 2. رسم خلفية تقنية فخمة ذاتياً في أقل من ثانية (بدون الاعتماد على مواقع خارجية)
+print("2. جاري تصميم الخلفية التقنية الهندسية لعلامة MdaMiak...")
+W, H = 1080, 1080
+base = Image.new("RGB", (W, H), (6, 11, 24))
+draw_bg = ImageDraw.Draw(base)
 
-if bg_image is None:
-    bg_image = Image.new("RGBA", (1080, 1080), (10, 18, 36, 255))
+# تدرج لوني وإضاءة مركزية (Radial Cyber Glow)
+cx, cy = W // 2, H // 2
+for r in range(520, 0, -4):
+    ratio = 1 - (r / 520)
+    red = int(6 + 8 * ratio)
+    green = int(14 + 65 * (ratio ** 1.5))
+    blue = int(30 + 115 * (ratio ** 1.5))
+    draw_bg.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(red, green, blue))
 
-# طبقة تظليل فخمة لإبراز النص العربي بوضوح عالٍ
-overlay = Image.new("RGBA", (1080, 1080), (6, 12, 28, 185))
-final_img = Image.alpha_composite(bg_image, overlay).convert("RGB")
+# رسم شبكة الذكاء الاصطناعي والروابط الهندسية (Tech Nodes & Grid)
+overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+draw_ov = ImageDraw.Draw(overlay)
+
+for x in range(0, W, 90):
+    draw_ov.line([(x, 0), (x, H)], fill=(0, 210, 255, 14), width=1)
+for y in range(0, H, 90):
+    draw_ov.line([(0, y), (W, y)], fill=(0, 210, 255, 14), width=1)
+
+# دوائر وعقد تقنية مضيئة
+random.seed(len(headline) + random.randint(1, 1000))
+nodes = [(random.randint(100, 980), random.randint(100, 980)) for _ in range(18)]
+for i in range(len(nodes)):
+    for j in range(i + 1, len(nodes)):
+        dist = math.hypot(nodes[i][0] - nodes[j][0], nodes[i][1] - nodes[j][1])
+        if dist < 280:
+            draw_ov.line([nodes[i], nodes[j]], fill=(0, 210, 255, 35), width=2)
+
+for nx, ny in nodes:
+    draw_ov.ellipse([nx - 5, ny - 5, nx + 5, ny + 5], fill=(0, 225, 255, 95))
+
+final_img = Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB")
 draw = ImageDraw.Draw(final_img)
 
 # 3. تحميل الخط العربي (Tajawal Bold)
-print("3. جاري تحميل الخط العربي وتصميم البطاقة...")
 font_url = "https://github.com/google/fonts/raw/main/ofl/tajawal/Tajawal-Bold.ttf"
-font_bytes = requests.get(font_url, timeout=20).content
+font_bytes = requests.get(font_url, timeout=15).content
 
 title_font = ImageFont.truetype(BytesIO(font_bytes), 64, layout_engine=ImageFont.Layout.RAQM)
 brand_font = ImageFont.truetype(BytesIO(font_bytes), 42, layout_engine=ImageFont.Layout.RAQM)
 footer_font = ImageFont.truetype(BytesIO(font_bytes), 30, layout_engine=ImageFont.Layout.RAQM)
 
 # 4. رسم الإطار والهوية البصرية (مداميك | MdaMiak)
-draw.rectangle([(55, 55), (1025, 1025)], outline=(0, 210, 255), width=2)
-draw.text((540, 130), "مداميك | MdaMiak", font=brand_font, fill=(0, 210, 255), anchor="mm", direction="rtl")
-draw.line([(380, 175), (700, 175)], fill=(0, 210, 255), width=3)
+draw.rectangle([(50, 50), (1030, 1030)], outline=(0, 210, 255), width=2)
+draw.rectangle([(62, 62), (1018, 1018)], outline=(0, 110, 160), width=1)
+
+draw.text((540, 130), "مداميك | MdaMiak", font=brand_font, fill=(0, 215, 255), anchor="mm", direction="rtl")
+draw.line([(370, 175), (710, 175)], fill=(0, 215, 255), width=3)
 
 # 5. تقسيم وطباعة العنوان الرئيسي في المنتصف
 words = headline.split()
@@ -129,7 +144,8 @@ for line in lines:
     y_pos += 105
 
 # 6. طباعة التوقيع السفلي
-draw.text((540, 955), "نبني مستقبلك الرقمي بذكاء | @MdaMiak", font=footer_font, fill=(180, 200, 225), anchor="mm", direction="rtl")
+draw.line([(320, 910), (760, 910)], fill=(0, 110, 160), width=1)
+draw.text((540, 955), "نبني مستقبلك الرقمي بذكاء | @MdaMiak", font=footer_font, fill=(185, 205, 230), anchor="mm", direction="rtl")
 
 # 7. حفظ المخرجات
 os.makedirs("output", exist_ok=True)
@@ -137,4 +153,4 @@ final_img.save("output/post_image.jpg", quality=95)
 with open("output/caption.txt", "w", encoding="utf-8") as f:
     f.write(caption)
 
-print("🎉 تم إنتاج التصميم والمنشور الجديد بنجاح!")
+print("🎉 تم إنتاج التصميم والمنشور الجديد بنجاح فائق السرعة!")
