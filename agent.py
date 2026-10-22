@@ -6,7 +6,7 @@ import requests
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
-# 1. الاتصال بـ Gemini API مع تشخيص دقيق
+# 1. الاتصال الذكي بـ Gemini API (يدعم gemini-3.8-flash ويكتشف النماذج تلقائياً)
 api_key = os.environ.get("GEMINI_API_KEY", "").strip()
 
 topics = [
@@ -14,7 +14,7 @@ topics = [
     "كيف تربط واتساب بجدول بيانات جوجل للرد التلقائي على العملاء",
     "السر وراء كتابة أوامر (Prompts) احترافية تعطيك نتائج دقيقة من أول مرة",
     "كيف توفر 15 ساعة أسبوعياً عبر أتمتة المهام المتكررة في مشروعك",
-    "لماذا تحتاج الشركات الناشئة إلى وكيل ذكاء اصطناعي (AI Agent) في 2026؟"
+    "لماذا تحتاج الشركات الناشئة إلى وكيل ذكاء اصطناعي (AI Agent)؟"
 ]
 selected_topic = random.choice(topics)
 
@@ -26,18 +26,32 @@ prompt = f"""أنت المدير الإبداعي لعلامة (مَداميك |
   "caption": "نص المنشور الكامل بأسلوب شيق مع نقاط واضحة وسؤال تفاعلي في النهاية والهاشتاجات"
 }}"""
 
-print("1. جاري الاتصال بـ Gemini...")
+print("1. جاري توليد المحتوى عبر Gemini...")
 data = None
 error_logs = []
 
-# قائمة النماذج المعتمدة من الأحدث للأقدم
-models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-pro"]
+# وضعنا gemini-3.8-flash في المقدمة + جلب تلقائي لأي نموذج متاح في الحساب
+models = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.0-flash"]
+try:
+    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+    list_res = requests.get(list_url, timeout=10)
+    if list_res.status_code == 200:
+        for m in list_res.json().get("models", []):
+            if "generateContent" in m.get("supportedGenerationMethods", []):
+                m_name = m["name"].replace("models/", "")
+                if m_name not in models:
+                    models.append(m_name)
+except Exception:
+    pass
 
 for model_name in models:
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        res = requests.post(url, json=payload, timeout=15)
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"}
+        }
+        res = requests.post(url, json=payload, timeout=20)
         if res.status_code == 200:
             raw_text = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
             if "```" in raw_text:
@@ -48,38 +62,28 @@ for model_name in models:
             end_idx = raw_text.rfind("}") + 1
             if start_idx != -1 and end_idx != 0:
                 data = json.loads(raw_text[start_idx:end_idx])
-                print(f"✅ نجح التوليد عبر: {model_name}")
+                print(f"✅ نجح التوليد عبر نموذج: {model_name}")
                 break
         else:
-            error_logs.append(f"{model_name}: {res.status_code} -> {res.text[:180]}")
+            error_logs.append(f"{model_name}: {res.status_code}")
     except Exception as e:
-        error_logs.append(f"{model_name} Exception: {str(e)}")
+        error_logs.append(f"{model_name} Error: {str(e)}")
 
 if not data:
-    debug_info = "\n".join(error_logs)
     data = {
         "headline": "أتمتة المهام: سلاحك السري لمضاعفة أرباحك",
-        "caption": (
-            "في مَداميك | MdaMiak نحول المهام اليومية المتكررة إلى أنظمة ذكية تعمل تلقائياً بدقة وسرعة.\n\n"
-            "🔹 توفير 70% من وقت الفريق\n"
-            "🔹 تقليل الأخطاء البشرية إلى الصفر\n"
-            "🔹 خدمة عملاء فورية على مدار الساعة\n\n"
-            "ما هي المهمة التي تستهلك معظم وقتك حالياً؟ شاركنا في التعليقات! 👇\n\n"
-            "#مداميك #MdaMiak #ذكاء_اصطناعي #أتمتة_الأعمال\n\n"
-            f"--- [تشخيص الاتصال التقني بـ Gemini] ---\n{debug_info}"
-        )
+        "caption": "في مَداميك | MdaMiak نحول المهام اليومية المتكررة إلى أنظمة ذكية تعمل تلقائياً بدقة وسرعة.\n\n#مداميك #MdaMiak"
     }
 
 headline = data.get("headline", "حلول الأتمتة الذكية من مداميك")
 caption = data.get("caption", "")
 
-# 2. رسم خلفية تقنية فخمة ذاتياً في أقل من ثانية (بدون الاعتماد على مواقع خارجية)
-print("2. جاري تصميم الخلفية التقنية الهندسية لعلامة MdaMiak...")
+# 2. رسم الخلفية التقنية الهندسية لعلامة MdaMiak
+print("2. جاري تصميم البطاقة البصرية...")
 W, H = 1080, 1080
 base = Image.new("RGB", (W, H), (6, 11, 24))
 draw_bg = ImageDraw.Draw(base)
 
-# تدرج لوني وإضاءة مركزية (Radial Cyber Glow)
 cx, cy = W // 2, H // 2
 for r in range(520, 0, -4):
     ratio = 1 - (r / 520)
@@ -88,7 +92,6 @@ for r in range(520, 0, -4):
     blue = int(30 + 115 * (ratio ** 1.5))
     draw_bg.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(red, green, blue))
 
-# رسم شبكة الذكاء الاصطناعي والروابط الهندسية (Tech Nodes & Grid)
 overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
 draw_ov = ImageDraw.Draw(overlay)
 
@@ -97,8 +100,7 @@ for x in range(0, W, 90):
 for y in range(0, H, 90):
     draw_ov.line([(0, y), (W, y)], fill=(0, 210, 255, 14), width=1)
 
-# دوائر وعقد تقنية مضيئة
-random.seed(len(headline) + random.randint(1, 1000))
+random.seed(len(headline) + random.randint(1, 10000))
 nodes = [(random.randint(100, 980), random.randint(100, 980)) for _ in range(18)]
 for i in range(len(nodes)):
     for j in range(i + 1, len(nodes)):
@@ -153,4 +155,4 @@ final_img.save("output/post_image.jpg", quality=95)
 with open("output/caption.txt", "w", encoding="utf-8") as f:
     f.write(caption)
 
-print("🎉 تم إنتاج التصميم والمنشور الجديد بنجاح فائق السرعة!")
+print("🎉 تم إنتاج التصميم والمنشور الجديد بنجاح!")
