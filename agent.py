@@ -6,32 +6,33 @@ import requests
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
-# 1. الاتصال الذكي بـ Gemini API (يدعم gemini-3.8-flash ويكتشف النماذج تلقائياً)
+# 1. قراءة المفاتيح السرية
 api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+tg_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+tg_chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 
 topics = [
     "3 أدوات ذكاء اصطناعي مجانية تضاعف إنتاجية رواد الأعمال",
     "كيف تربط واتساب بجدول بيانات جوجل للرد التلقائي على العملاء",
     "السر وراء كتابة أوامر (Prompts) احترافية تعطيك نتائج دقيقة من أول مرة",
     "كيف توفر 15 ساعة أسبوعياً عبر أتمتة المهام المتكررة في مشروعك",
-    "لماذا تحتاج الشركات الناشئة إلى وكيل ذكاء اصطناعي (AI Agent)؟"
+    "لماذا تحتاج الشركات الناشئة إلى وكيل ذكاء اصطناعي (AI Agent)؟",
+    "كيف تحول خدمة العملاء في شركتك إلى نظام آلي يعمل 24 ساعة؟"
 ]
 selected_topic = random.choice(topics)
 
-prompt = f"""أنت المدير الإبداعي لعلامة (مَداميك | MdaMiak) المتخصصة في الأتمتة، وكلاء الذكاء الاصطناعي، والحلول الرقمية.
+prompt = f"""أنت المدير الإبداعي لعلامة (مِداميك | MdaMiak) المتخصصة في الأتمتة، وكلاء الذكاء الاصطناعي، والحلول الرقمية.
 اكتب منشوراً احترافياً وجذاباً لفيسبوك وانستجرام حول: ({selected_topic}).
 أرجع النتيجة بصيغة JSON فقط تحتوي على مفتاحين:
 {{
   "headline": "عنوان عربي قوي وخاطف للانتباه بدون تشكيل من 5 إلى 7 كلمات",
-  "caption": "نص المنشور الكامل بأسلوب شيق مع نقاط واضحة وسؤال تفاعلي في النهاية والهاشتاجات"
+  "caption": "نص المنشور الكامل بأسلوب شيق مع نقاط واضحة وسؤال تفاعلي في النهاية والهاشتاجات (أقل من 900 حرف)"
 }}"""
 
 print("1. جاري توليد المحتوى عبر Gemini...")
 data = None
-error_logs = []
-
-# وضعنا gemini-3.8-flash في المقدمة + جلب تلقائي لأي نموذج متاح في الحساب
 models = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.0-flash"]
+
 try:
     list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
     list_res = requests.get(list_url, timeout=10)
@@ -64,21 +65,19 @@ for model_name in models:
                 data = json.loads(raw_text[start_idx:end_idx])
                 print(f"✅ نجح التوليد عبر نموذج: {model_name}")
                 break
-        else:
-            error_logs.append(f"{model_name}: {res.status_code}")
     except Exception as e:
-        error_logs.append(f"{model_name} Error: {str(e)}")
+        print(f"⚠️ محاولة {model_name}: {e}")
 
 if not data:
     data = {
         "headline": "أتمتة المهام: سلاحك السري لمضاعفة أرباحك",
-        "caption": "في مَداميك | MdaMiak نحول المهام اليومية المتكررة إلى أنظمة ذكية تعمل تلقائياً بدقة وسرعة.\n\n#مداميك #MdaMiak"
+        "caption": "في مِداميك | MdaMiak نحول المهام اليومية المتكررة إلى أنظمة ذكية تعمل تلقائياً بدقة وسرعة.\n\n#مداميك #MdaMiak #ذكاء_اصطناعي"
     }
 
 headline = data.get("headline", "حلول الأتمتة الذكية من مداميك")
 caption = data.get("caption", "")
 
-# 2. رسم الخلفية التقنية الهندسية لعلامة MdaMiak
+# 2. رسم البطاقة البصرية لعلامة MdaMiak
 print("2. جاري تصميم البطاقة البصرية...")
 W, H = 1080, 1080
 base = Image.new("RGB", (W, H), (6, 11, 24))
@@ -122,14 +121,13 @@ title_font = ImageFont.truetype(BytesIO(font_bytes), 64, layout_engine=ImageFont
 brand_font = ImageFont.truetype(BytesIO(font_bytes), 42, layout_engine=ImageFont.Layout.RAQM)
 footer_font = ImageFont.truetype(BytesIO(font_bytes), 30, layout_engine=ImageFont.Layout.RAQM)
 
-# 4. رسم الإطار والهوية البصرية (مداميك | MdaMiak)
+# 4. رسم الإطار والهوية البصرية
 draw.rectangle([(50, 50), (1030, 1030)], outline=(0, 210, 255), width=2)
 draw.rectangle([(62, 62), (1018, 1018)], outline=(0, 110, 160), width=1)
 
 draw.text((540, 130), "مداميك | MdaMiak", font=brand_font, fill=(0, 215, 255), anchor="mm", direction="rtl")
 draw.line([(370, 175), (710, 175)], fill=(0, 215, 255), width=3)
 
-# 5. تقسيم وطباعة العنوان الرئيسي في المنتصف
 words = headline.split()
 lines, current_line = [], []
 for word in words:
@@ -145,14 +143,34 @@ for line in lines:
     draw.text((540, y_pos), line, font=title_font, fill=(255, 255, 255), anchor="mm", direction="rtl")
     y_pos += 105
 
-# 6. طباعة التوقيع السفلي
 draw.line([(320, 910), (760, 910)], fill=(0, 110, 160), width=1)
 draw.text((540, 955), "نبني مستقبلك الرقمي بذكاء | @MdaMiak", font=footer_font, fill=(185, 205, 230), anchor="mm", direction="rtl")
 
-# 7. حفظ المخرجات
+# 5. حفظ المخرجات
 os.makedirs("output", exist_ok=True)
-final_img.save("output/post_image.jpg", quality=95)
+image_path = "output/post_image.jpg"
+final_img.save(image_path, quality=95)
 with open("output/caption.txt", "w", encoding="utf-8") as f:
     f.write(caption)
 
-print("🎉 تم إنتاج التصميم والمنشور الجديد بنجاح!")
+# 6. إرسال البطاقة والمنشور مباشرة إلى تيليجرام
+if tg_token and tg_chat_id:
+    print("3. جاري إرسال المنشور والتصميم إلى تيليجرام...")
+    tg_url = f"https://api.telegram.org/bot{tg_token}/sendPhoto"
+    
+    # تيليجرام يقبل حتى 1024 حرفاً في وصف الصورة الواحدة
+    short_caption = caption[:1000] if len(caption) > 1000 else caption
+    
+    with open(image_path, "rb") as img_file:
+        tg_res = requests.post(
+            tg_url,
+            data={"chat_id": tg_chat_id, "caption": short_caption},
+            files={"photo": img_file},
+            timeout=30
+        )
+    if tg_res.status_code == 200:
+        print("🚀 تم إرسال التصميم والمنشور إلى حسابك في تيليجرام بنجاح!")
+    else:
+        print(f"⚠️ فشل الإرسال إلى تيليجرام: {tg_res.status_code} - {tg_res.text}")
+else:
+    print("⚠️ مفاتيح تيليجرام غير ممررة في ملف التشغيل.")
