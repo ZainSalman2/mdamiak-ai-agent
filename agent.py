@@ -153,24 +153,38 @@ final_img.save(image_path, quality=95)
 with open("output/caption.txt", "w", encoding="utf-8") as f:
     f.write(caption)
 
-# 6. إرسال البطاقة والمنشور مباشرة إلى تيليجرام
+# 6. إرسال البطاقة والمنشور إلى تيليجرام مع الأزرار التفاعلية
 if tg_token and tg_chat_id:
-    print("3. جاري إرسال المنشور والتصميم إلى تيليجرام...")
+    print("3. جاري إرسال المنشور مع الأزرار التفاعلية إلى تيليجرام...")
     tg_url = f"https://api.telegram.org/bot{tg_token}/sendPhoto"
     
-    # تيليجرام يقبل حتى 1024 حرفاً في وصف الصورة الواحدة
     short_caption = caption[:1000] if len(caption) > 1000 else caption
+    
+    # تصميم الأزرار التفاعلية تحت الرسالة
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "🚀 نشر على فيسبوك وانستجرام", "callback_data": "publish_post"},
+                {"text": "🔄 توليد منشور جديد", "callback_data": "regenerate_post"}
+            ]
+        ]
+    }
     
     with open(image_path, "rb") as img_file:
         tg_res = requests.post(
             tg_url,
-            data={"chat_id": tg_chat_id, "caption": short_caption},
+            data={
+                "chat_id": tg_chat_id,
+                "caption": f"🤖 **منشور جديد جاهز للمراجعة (MdaMiak):**\n\n{short_caption}",
+                "parse_mode": "Markdown",
+                "reply_markup": json.dumps(keyboard)
+            },
             files={"photo": img_file},
             timeout=30
         )
     if tg_res.status_code == 200:
-        print("🚀 تم إرسال التصميم والمنشور إلى حسابك في تيليجرام بنجاح!")
+        print("🚀 تم إرسال المنشور مع الأزرار التفاعلية إلى تيليجرام بنجاح!")
     else:
-        print(f"⚠️ فشل الإرسال إلى تيليجرام: {tg_res.status_code} - {tg_res.text}")
+        print(f"⚠️ فشل الإرسال: {tg_res.status_code} - {tg_res.text}")
 else:
-    print("⚠️ مفاتيح تيليجرام غير ممررة في ملف التشغيل.")
+    print("⚠️ مفاتيح تيليجرام غير ممررة.")
