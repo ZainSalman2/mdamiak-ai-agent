@@ -151,22 +151,13 @@ os.makedirs("output", exist_ok=True)
 image_path = "output/post_image.jpg"
 final_img.save(image_path, quality=95)
 
-# 6. إرسال البطاقة والمنشور مع الأزرار التفاعلية بشكل نظيف
+# 6. إرسال البطاقة والمنشور بتنسيق نظيف ومستقر 100%
 if tg_token and tg_chat_id:
-    print("3. جاري إرسال المنشور مع الأزرار إلى تيليجرام...")
+    print("3. جاري إرسال المنشور إلى تيليجرام...")
     tg_url = f"https://api.telegram.org/bot{tg_token}/sendPhoto"
     
-    short_caption = caption[:900] if len(caption) > 900 else caption
-    full_text = f"منشور جديد جاهز للمراجعة (MdaMiak):\n\n{short_caption}"
-    
-    keyboard = {
-        "inline_keyboard": [
-            [
-                {"text": "🚀 نشر على فيسبوك وانستجرام", "callback_data": "publish_post"},
-                {"text": "🔄 توليد منشور جديد", "callback_data": "regenerate_post"}
-            ]
-        ]
-    }
+    short_caption = caption[:1000] if len(caption) > 1000 else caption
+    full_text = f"🤖 منشور جديد جاهز للنشر (MdaMiak):\n\n{short_caption}\n\n🔗 [رابط تشغيل الوكيل اليدوي في جيثب](https://github.com/ZainSalman2/mdamiak-ai-agent/actions)"
     
     with open(image_path, "rb") as img_file:
         tg_res = requests.post(
@@ -174,13 +165,13 @@ if tg_token and tg_chat_id:
             data={
                 "chat_id": tg_chat_id,
                 "caption": full_text,
-                "reply_markup": json.dumps(keyboard)
+                "parse_mode": "Markdown"
             },
             files={"photo": img_file},
             timeout=30
         )
     if tg_res.status_code == 200:
-        print("🚀 تم الإرسال بنجاح والأزرار مفعلة!")
+        print("🚀 تم الإرسال بنجاح تام!")
     else:
         print(f"⚠️ فشل الإرسال: {tg_res.status_code} - {tg_res.text}")
 else:
