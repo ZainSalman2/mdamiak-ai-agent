@@ -150,17 +150,15 @@ draw.text((540, 955), "نبني مستقبلك الرقمي بذكاء | @MdaMia
 os.makedirs("output", exist_ok=True)
 image_path = "output/post_image.jpg"
 final_img.save(image_path, quality=95)
-with open("output/caption.txt", "w", encoding="utf-8") as f:
-    f.write(caption)
 
-# 6. إرسال البطاقة والمنشور إلى تيليجرام مع الأزرار التفاعلية
+# 6. إرسال البطاقة والمنشور مع الأزرار التفاعلية بشكل نظيف
 if tg_token and tg_chat_id:
-    print("3. جاري إرسال المنشور مع الأزرار التفاعلية إلى تيليجرام...")
+    print("3. جاري إرسال المنشور مع الأزرار إلى تيليجرام...")
     tg_url = f"https://api.telegram.org/bot{tg_token}/sendPhoto"
     
-    short_caption = caption[:1000] if len(caption) > 1000 else caption
+    short_caption = caption[:900] if len(caption) > 900 else caption
+    full_text = f"منشور جديد جاهز للمراجعة (MdaMiak):\n\n{short_caption}"
     
-    # تصميم الأزرار التفاعلية تحت الرسالة
     keyboard = {
         "inline_keyboard": [
             [
@@ -175,15 +173,14 @@ if tg_token and tg_chat_id:
             tg_url,
             data={
                 "chat_id": tg_chat_id,
-                "caption": f"🤖 **منشور جديد جاهز للمراجعة (MdaMiak):**\n\n{short_caption}",
-                "parse_mode": "Markdown",
+                "caption": full_text,
                 "reply_markup": json.dumps(keyboard)
             },
             files={"photo": img_file},
             timeout=30
         )
     if tg_res.status_code == 200:
-        print("🚀 تم إرسال المنشور مع الأزرار التفاعلية إلى تيليجرام بنجاح!")
+        print("🚀 تم الإرسال بنجاح والأزرار مفعلة!")
     else:
         print(f"⚠️ فشل الإرسال: {tg_res.status_code} - {tg_res.text}")
 else:
