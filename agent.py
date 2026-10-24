@@ -45,11 +45,29 @@ def send_to_telegram(bot_token, chat_id, image_path, caption):
         print(f"❌ استثناء أثناء إرسال تيليجرام: {e}")
 
 # ==========================================
-# 2. الدالة الرئيسية (توليد، تصميم، ونشر)
+# 2. توليد صورة تجريبية
+# ==========================================
+
+def create_sample_image(output_path="output.png"):
+    """إنشاء بطاقة بصرية تجريبية لعلامة مداميك"""
+    img = Image.new("RGB", (1080, 1080), color=(15, 23, 42))  # خلفية داكنة فخمة
+    draw = ImageDraw.Draw(img)
+    
+    # رسم إطار وبطاقة في المنتصف
+    draw.rectangle([(80, 80), (1000, 1000)], outline=(56, 189, 248), width=4)
+    
+    # نص تجريبي على التصميم
+    text = "MdaMiak | مداميك\nAI Automation Solutions"
+    draw.text((260, 500), text, fill=(255, 255, 255))
+    
+    img.save(output_path)
+    print("🎨 تم إنشاء الصورة بنجاح: output.png")
+
+# ==========================================
+# 3. الدالة الرئيسية (Main)
 # ==========================================
 
 def main():
-    # 1. استدعاء المفاتيح من بيئة التشغيل (GitHub Secrets)
     gemini_key = os.getenv("GEMINI_API_KEY")
     tg_token = os.getenv("TELEGRAM_BOT_TOKEN")
     tg_chat_id = os.getenv("TELEGRAM_CHAT_ID")
@@ -58,7 +76,27 @@ def main():
 
     image_path = "output.png"
     
-    # 2. توليد المحتوى والتصميم (تأكد من وجود الكود الخاص بك هنا لتوليد output.png و post_text)
-    # مثال للمحتوى النصي:
-    post_text = (
-        "
+    # 1. إنشاء الصورة
+    create_sample_image(image_path)
+
+    # 2. النص التسويقي
+    post_text = """مستقبل أعمالك يبدأ بالأتمتة الذكية.
+
+في مِداميك نطور لك وكلاء ذكاء اصطناعي مخصصين لرفع الكفاءة وتوفير الوقت والموارد.
+
+#مداميك #MdaMiak #ذكاء_اصطناعي #أتمتة_الأعمال"""
+
+    # 3. النشر التلقائي على صفحة فيسبوك
+    if fb_page_id and fb_page_token:
+        print("🚀 جارٍ النشر التلقائي على صفحة فيسبوك (MdaMiak)...")
+        post_to_facebook(fb_page_id, fb_page_token, image_path, post_text)
+    else:
+        print("⚠️ لم يتم العثور على مفاتيح فيسبوك في Secrets.")
+
+    # 4. إرسال النسخة إلى تيليجرام
+    if tg_token and tg_chat_id:
+        print("📲 جارٍ إرسال الإشعار والبطاقة إلى تيليجرام...")
+        send_to_telegram(tg_token, tg_chat_id, image_path, post_text)
+
+if __name__ == "__main__":
+    main()
