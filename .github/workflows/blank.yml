@@ -23,7 +23,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libraqm-dev libfribidi-dev libharfbuzz-dev
           pip install --upgrade pip
-          pip install requests pillow google-genai
+          pip install requests pillow arabic-reshaper python-bidi google-genai
 
       - name: Run AI Agent
         env:
