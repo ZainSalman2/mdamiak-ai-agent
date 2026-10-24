@@ -30,8 +30,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
-        run: |
-          python agent.py
+                  python agent.py
 
       - name: Upload Generated Post
         uses: actions/upload-artifact@v4
