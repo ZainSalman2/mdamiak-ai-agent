@@ -172,27 +172,36 @@ def publish_via_meta_business(cookies_json, image_path, caption):
             raw_cookies = json.loads(cookies_json)
             formatted_cookies = []
             
-            # تنظيف الكوكيز وضمان قبولها داخل Playwright
+            # فلترة وتنظيف الكوكيز بشكل آمن لتفادي أخطاء القيم الفارغة
             for c in raw_cookies:
+                name = c.get("name")
+                value = c.get("value")
+                if not name or value is None:
+                    continue
+
                 cookie_dict = {
-                    "name": c.get("name"),
-                    "value": c.get("value"),
-                    "domain": c.get("domain", ".facebook.com"),
-                    "path": c.get("path", "/")
+                    "name": str(name),
+                    "value": str(value),
+                    "domain": c.get("domain") or ".facebook.com",
+                    "path": c.get("path") or "/"
                 }
-                same_site = c.get("sameSite", "").capitalize()
-                if same_site in ["Strict", "Lax", "None"]:
-                    cookie_dict["sameSite"] = same_site
-                
-                if "secure" in c:
+
+                # فحص نفس الموقع بشكل آمن
+                raw_same_site = c.get("sameSite")
+                if raw_same_site and isinstance(raw_same_site, str):
+                    same_site_cap = raw_same_site.capitalize()
+                    if same_site_cap in ["Strict", "Lax", "None"]:
+                        cookie_dict["sameSite"] = same_site_cap
+
+                if "secure" in c and isinstance(c["secure"], bool):
                     cookie_dict["secure"] = c["secure"]
-                if "httpOnly" in c:
+                if "httpOnly" in c and isinstance(c["httpOnly"], bool):
                     cookie_dict["httpOnly"] = c["httpOnly"]
                 
                 formatted_cookies.append(cookie_dict)
 
             context.add_cookies(formatted_cookies)
-            print("🔑 تم تمرير الكوكيز بنجاح إلى بيئة المتصفح.")
+            print(f"🔑 تم تمرير {len(formatted_cookies)} ملف تعريف ارتباط (Cookies) بنجاح إلى بيئة المتصفح.")
         except Exception as e:
             print(f"❌ خطأ في معالجة الكوكيز: {e}")
             browser.close()
@@ -200,12 +209,11 @@ def publish_via_meta_business(cookies_json, image_path, caption):
 
         page = context.new_page()
 
-        # تنشيط الجلسة أولاً
+        # الدخول لتأكيد الجلسة
         page.goto("https://www.facebook.com/", wait_until="domcontentloaded")
         time.sleep(3)
 
-        # التوجه لنافذة النشر في Meta Business Suite
-        print("🚀 التوجه إلى لوحة نشر المنشورات...")
+        print("🚀 التوجه إلى لوحة نشر المنشورات في Meta Business Suite...")
         page.goto("https://business.facebook.com/latest/composer", wait_until="networkidle")
         time.sleep(5)
 
@@ -213,8 +221,7 @@ def publish_via_meta_business(cookies_json, image_path, caption):
         print(f"📍 الرابط الحالي: {current_url}")
 
         if "login" in current_url:
-            print("❌ فيسبوك يطلب تسجيل الدخول (الجلسة منتهية أو لم يتم تصديرها من business.facebook.com).")
-            page.screenshot(path="login_required.png")
+            print("❌ فيسبوك يطلب تسجيل الدخول. يرجى التأكد من تصدير الكوكيز وأنت داخل صفحة business.facebook.com/latest/composer.")
             browser.close()
             return False
 
@@ -241,7 +248,6 @@ def publish_via_meta_business(cookies_json, image_path, caption):
 
         except Exception as e:
             print(f"❌ تعذر استكمال خطوات النشر داخل الصفحة: {e}")
-            page.screenshot(path="error_composer.png")
             browser.close()
             return False
 
