@@ -1,125 +1,187 @@
 import os
 import requests
-from PIL import Image, ImageDraw, ImageFont
-import arabic_reshaper
-from bidi.algorithm import get_display
+from playwright.sync_api import sync_playwright
 
 # ==========================================
-# 1. معالجة النصوص العربية
+# 1. محرك التصميم فائق الدقة (HTML/CSS Browser)
 # ==========================================
-def format_arabic(text):
-    """إعادة تشكيل وعكس النص العربي ليظهر متصلاً وسليماً داخل الصور"""
-    if not text:
-        return ""
-    reshaped_text = arabic_reshaper.reshape(text)
-    return get_display(reshaped_text)
+def generate_perfect_card(title, body_points, output_path="output.png"):
+    """توليد بطاقة تسويقية بدقة 1080x1080 عبر محرك Chromium لضمان سلامة الخط العربي 100%"""
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+        <style>
+            * {{
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+                font-family: 'Cairo', sans-serif;
+            }}
+            body {{
+                width: 1080px;
+                height: 1080px;
+                background-color: #0b1329;
+                background-image: 
+                    radial-gradient(at 100% 0%, rgba(56, 189, 248, 0.15) 0px, transparent 50%),
+                    radial-gradient(at 0% 100%, rgba(37, 99, 235, 0.2) 0px, transparent 50%);
+                color: #ffffff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 40px;
+            }}
+            .card {{
+                width: 100%;
+                height: 100%;
+                border: 2px solid rgba(56, 189, 248, 0.3);
+                border-radius: 28px;
+                background: rgba(15, 23, 42, 0.75);
+                backdrop-filter: blur(12px);
+                padding: 50px 60px;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            }}
+            .header {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 2px solid rgba(51, 65, 85, 0.8);
+                padding-bottom: 24px;
+            }}
+            .brand-ar {{
+                font-size: 40px;
+                font-weight: 900;
+                color: #38bdf8;
+            }}
+            .brand-en {{
+                font-size: 26px;
+                font-weight: 700;
+                color: #94a3b8;
+                letter-spacing: 1px;
+            }}
+            .main-content {{
+                display: flex;
+                flex-direction: column;
+                gap: 30px;
+                text-align: center;
+                margin: auto 0;
+            }}
+            .title {{
+                font-size: 46px;
+                font-weight: 900;
+                line-height: 1.4;
+                color: #ffffff;
+            }}
+            .content-box {{
+                background: rgba(30, 41, 59, 0.6);
+                border: 1px solid rgba(56, 189, 248, 0.2);
+                border-radius: 20px;
+                padding: 35px 30px;
+                display: flex;
+                flex-direction: column;
+                gap: 18px;
+            }}
+            .point {{
+                font-size: 28px;
+                font-weight: 600;
+                color: #cbd5e1;
+            }}
+            .highlight {{
+                color: #38bdf8;
+                font-weight: 700;
+            }}
+            .footer {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-top: 2px solid rgba(51, 65, 85, 0.8);
+                padding-top: 24px;
+                font-size: 22px;
+                font-weight: 600;
+                color: #94a3b8;
+            }}
+            .website {{
+                color: #38bdf8;
+                direction: ltr;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="header">
+                <div class="brand-ar">مِداميك للذكاء الاصطناعي</div>
+                <div class="brand-en">MdaMiak AI</div>
+            </div>
+            
+            <div class="main-content">
+                <div class="title">{title}</div>
+                <div class="content-box">
+                    <div class="point">{body_points[0]}</div>
+                    <div class="point highlight">{body_points[1]}</div>
+                    <div class="point">{body_points[2]}</div>
+                </div>
+            </div>
+
+            <div class="footer">
+                <div>نحو تحول رقمي متكامل بحلول الأتمتة والذكاء الاصطناعي</div>
+                <div class="website">mdamiak.com</div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    with open("card_template.html", "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 1080, "height": 1080})
+        page.goto(f"file://{os.path.abspath('card_template.html')}")
+        page.wait_for_load_state("networkidle")
+        page.screenshot(path=output_path)
+        browser.close()
+    
+    print("🎨 تم توليد الصورة الاحترافية بنجاح عبر المحرك البصري.")
 
 # ==========================================
-# 2. دوال النشر والإرسال (Facebook & Telegram)
+# 2. دوال النشر والإرسال
 # ==========================================
 def post_to_facebook(page_id, access_token, image_path, caption):
-    """رفع المنشور إلى صفحة فيسبوك عبر Meta Graph API"""
     url = f"https://graph.facebook.com/v26.0/{page_id}/photos"
-    try:
-        with open(image_path, "rb") as img_file:
-            payload = {
-                "caption": caption,
-                "access_token": access_token
-            }
-            files = {"source": img_file}
-            response = requests.post(url, data=payload, files=files)
-            
-        res_data = response.json()
-        if response.status_code == 200 and "id" in res_data:
-            print(f"✅ تم النشر بنجاح على فيسبوك! Post ID: {res_data['id']}")
-            return True
-        else:
-            err = res_data.get('error', {})
-            print(f"❌ فشل النشر على فيسبوك: [{err.get('code')}] {err.get('message')}")
-            return False
-    except Exception as e:
-        print(f"❌ استثناء أثناء النشر على فيسبوك: {e}")
+    with open(image_path, "rb") as img_file:
+        payload = {"caption": caption, "access_token": access_token}
+        files = {"source": img_file}
+        response = requests.post(url, data=payload, files=files)
+    
+    res = response.json()
+    if response.status_code == 200 and "id" in res:
+        print(f"✅ تم النشر بنجاح على فيسبوك! معرف المنشور: {res['id']}")
+        return True
+    else:
+        err = res.get('error', {})
+        print(f"❌ خطأ صريح من فيسبوك: [{err.get('code')}] {err.get('message')}")
         return False
 
 def send_to_telegram(bot_token, chat_id, image_path, caption):
-    """إرسال نسخة إلى تيليجرام"""
     url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
-    try:
-        with open(image_path, "rb") as img_file:
-            data = {"chat_id": chat_id, "caption": caption}
-            files = {"photo": img_file}
-            res = requests.post(url, data=data, files=files)
-        if res.status_code == 200:
-            print("✅ تم إرسال المعاينة إلى تيليجرام بنجاح.")
-        else:
-            print(f"⚠️ خطأ تيليجرام: {res.text}")
-    except Exception as e:
-        print(f"❌ استثناء تيليجرام: {e}")
+    with open(image_path, "rb") as img_file:
+        data = {"chat_id": chat_id, "caption": caption}
+        files = {"photo": img_file}
+        res = requests.post(url, data=data, files=files)
+    if res.status_code == 200:
+        print("✅ تم إرسال البطاقة لمعاينتها على تيليجرام.")
 
 # ==========================================
-# 3. محرك التصميم البصري (MdaMiak Card)
-# ==========================================
-def get_system_font(size):
-    """استدعاء خط عربي مثبت رسمياً في نظام التشغيل"""
-    possible_paths = [
-        "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf",
-        "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    ]
-    for path in possible_paths:
-        if os.path.exists(path):
-            try:
-                return ImageFont.truetype(path, size)
-            except Exception:
-                continue
-    return ImageFont.load_default()
-
-def generate_social_card(output_path="output.png"):
-    width, height = 1080, 1080
-    
-    font_large = get_system_font(52)
-    font_medium = get_system_font(34)
-    font_small = get_system_font(24)
-
-    # إنشاء خلفية داكنة راقية
-    img = Image.new("RGB", (width, height), color=(11, 19, 38))
-    draw = ImageDraw.Draw(img)
-
-    # إطارات ولمسات الهوية التقنية
-    draw.rectangle([(30, 30), (1050, 1050)], outline=(30, 41, 59), width=2)
-    draw.rounded_rectangle([(60, 60), (1020, 1020)], radius=24, fill=(15, 23, 42), outline=(56, 189, 248), width=3)
-
-    # 1. الترويسة
-    header_ar = format_arabic("مِداميك للذكاء الاصطناعي")
-    draw.text((960, 110), header_ar, fill=(56, 189, 248), font=font_large, anchor="ra")
-    draw.text((120, 125), "MdaMiak AI", fill=(148, 163, 184), font=font_medium)
-    draw.line([(100, 200), (980, 200)], fill=(51, 65, 85), width=2)
-
-    # 2. بطاقة المحتوى في المنتصف
-    draw.rounded_rectangle([(100, 310), (980, 770)], radius=20, fill=(23, 37, 84), outline=(37, 99, 235), width=2)
-
-    title_ar = format_arabic("أتمتة العمليات الرقمية")
-    body_line1 = format_arabic("حوّل مهامك الروتينية المتكررة إلى تدفقات ذكية")
-    body_line2 = format_arabic("ارفع كفاءة التشغيل بنسبة تصل إلى 40%")
-    body_line3 = format_arabic("حلول مخصصة تعتمد على وكلاء الذكاء الاصطناعي")
-
-    draw.text((540, 390), title_ar, fill=(255, 255, 255), font=font_large, anchor="mm")
-    draw.text((540, 500), body_line1, fill=(226, 232, 240), font=font_medium, anchor="mm")
-    draw.text((540, 575), body_line2, fill=(56, 189, 248), font=font_medium, anchor="mm")
-    draw.text((540, 650), body_line3, fill=(148, 163, 184), font=font_small, anchor="mm")
-
-    # 3. شريط الفوتر
-    draw.line([(100, 880), (980, 880)], fill=(51, 65, 85), width=2)
-    footer_ar = format_arabic("بناء وتطوير وكلاء الذكاء الاصطناعي | مداميك")
-    draw.text((960, 915), footer_ar, fill=(148, 163, 184), font=font_small, anchor="ra")
-    draw.text((100, 915), "mdamiak.com", fill=(56, 189, 248), font=font_small)
-
-    img.save(output_path, quality=95)
-    print("🎨 تم توليد البطاقة العربية بنجاح.")
-
-# ==========================================
-# 4. نقطة الانطلاق
+# 3. التشغيل
 # ==========================================
 def main():
     fb_page_id = os.getenv("FB_PAGE_ID")
@@ -129,8 +191,15 @@ def main():
 
     image_path = "output.png"
     
-    # توليد البطاقة
-    generate_social_card(image_path)
+    # محتوى التصميم
+    title = "أتمتة العمليات الرقمية لشركتك"
+    points = [
+        "حوّل مهامك الروتينية المتكررة إلى تدفقات ذكية",
+        "ارفع كفاءة التشغيل وخفّض الهدر الزمني بنسبة 40%",
+        "وكلاء ذكاء اصطناعي مخصصون لتطوير أعمالك"
+    ]
+
+    generate_perfect_card(title, points, image_path)
 
     post_caption = """كفاءة أعلى، وقت أسرع، وأخطاء أقل.
 
@@ -138,14 +207,12 @@ def main():
 
 #مِداميك #MdaMiak #أتمتة_الأعمال #ذكاء_اصطناعي #تحول_رقمي"""
 
-    # محاولة النشر على فيسبوك
     if fb_page_id and fb_page_token:
-        print("🚀 محاولة النشر على صفحة فيسبوك...")
+        print("🚀 جارٍ إرسال المنشور إلى فيسبوك...")
         post_to_facebook(fb_page_id, fb_page_token, image_path, post_caption)
     else:
-        print("⚠️ لم يتم العثور على مفاتيح فيسبوك.")
+        print("⚠️ مفاتيح فيسبوك غير متوفرة في Secrets.")
 
-    # الإرسال لتيليجرام
     if tg_token and tg_chat_id:
         send_to_telegram(tg_token, tg_chat_id, image_path, post_caption)
 
