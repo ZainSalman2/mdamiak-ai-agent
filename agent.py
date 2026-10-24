@@ -157,7 +157,7 @@ def generate_perfect_card(title, body_points, output_path="output.png"):
 # 2. النشر التلقائي عبر متصفح سحابي (Playwright)
 # ==========================================
 def publish_via_meta_business(cookies_json, image_path, caption):
-    """أتمتة النشر المباشر على صفحة فيسبوك باستخدام جلسة المتصفح المعتمدة"""
+    """أتمتة النشر المباشر على صفحة فيسبوك وانستغرام عبر Meta Business Suite"""
     print("🌐 جارٍ تشغيل المتصفح وتثبيت جلسة الدخول...")
     
     with sync_playwright() as p:
@@ -171,8 +171,6 @@ def publish_via_meta_business(cookies_json, image_path, caption):
         try:
             raw_cookies = json.loads(cookies_json)
             formatted_cookies = []
-            
-            # فلترة وتنظيف الكوكيز بشكل آمن لتفادي أخطاء القيم الفارغة
             for c in raw_cookies:
                 name = c.get("name")
                 value = c.get("value")
@@ -185,8 +183,6 @@ def publish_via_meta_business(cookies_json, image_path, caption):
                     "domain": c.get("domain") or ".facebook.com",
                     "path": c.get("path") or "/"
                 }
-
-                # فحص نفس الموقع بشكل آمن
                 raw_same_site = c.get("sameSite")
                 if raw_same_site and isinstance(raw_same_site, str):
                     same_site_cap = raw_same_site.capitalize()
@@ -201,7 +197,7 @@ def publish_via_meta_business(cookies_json, image_path, caption):
                 formatted_cookies.append(cookie_dict)
 
             context.add_cookies(formatted_cookies)
-            print(f"🔑 تم تمرير {len(formatted_cookies)} ملف تعريف ارتباط (Cookies) بنجاح إلى بيئة المتصفح.")
+            print(f"🔑 تم تمرير {len(formatted_cookies)} ملف تعريف ارتباط بنجاح.")
         except Exception as e:
             print(f"❌ خطأ في معالجة الكوكيز: {e}")
             browser.close()
@@ -209,45 +205,53 @@ def publish_via_meta_business(cookies_json, image_path, caption):
 
         page = context.new_page()
 
-        # الدخول لتأكيد الجلسة
-        page.goto("https://www.facebook.com/", wait_until="domcontentloaded")
-        time.sleep(3)
-
-        print("🚀 التوجه إلى لوحة نشر المنشورات في Meta Business Suite...")
-        page.goto("https://business.facebook.com/latest/composer", wait_until="networkidle")
-        time.sleep(5)
-
-        current_url = page.url
-        print(f"📍 الرابط الحالي: {current_url}")
-
-        if "login" in current_url:
-            print("❌ فيسبوك يطلب تسجيل الدخول. يرجى التأكد من تصدير الكوكيز وأنت داخل صفحة business.facebook.com/latest/composer.")
-            browser.close()
-            return False
+        # الدخول المباشر إلى واجهة إنشاء المنشور لصفحة مِداميك
+        composer_url = "https://business.facebook.com/latest/composer?asset_id=853619644495122&business_id=1638405850984526"
+        print(f"🚀 التوجه مباشرة لنافذة النشر: {composer_url}")
+        page.goto(composer_url, wait_until="networkidle")
+        time.sleep(6)
 
         try:
-            print("📝 جارٍ رفع التصميم وكتابة الوصف...")
-            file_input = page.locator('input[type="file"]').first
-            file_input.set_input_files(os.path.abspath(image_path))
-            time.sleep(5)
+            print("📸 تفعيل حقل رفع الصور...")
+            
+            # رفع الصورة عبر محدد الملفات أو عبر input المباشر
+            try:
+                with page.expect_file_chooser(timeout=7000) as fc_info:
+                    add_photo_btn = page.locator('div[role="button"]:has-text("إضافة صورة"), div[role="button"]:has-text("Add photo"), button:has-text("إضافة صورة"), button:has-text("Add Photo")').first
+                    add_photo_btn.click()
+                file_chooser = fc_info.value
+                file_chooser.set_files(os.path.abspath(image_path))
+            except Exception:
+                print("🔄 رفع الملف عبر حقل الإدخال المباشر...")
+                file_input = page.locator('input[type="file"]')
+                file_input.set_input_files(os.path.abspath(image_path))
 
-            # تحديد حقل النص والكتابة فيه
+            print("✅ تم إرفاق التصميم بنجاح. جارٍ الانتظار للتحميل...")
+            time.sleep(7)
+
+            # كتابة النص في صندوق المنشور
+            print("✍️ كتابة الوصف التسويقي...")
             text_box = page.locator('div[role="textbox"]').first
             text_box.click()
             page.keyboard.type(caption, delay=15)
-            time.sleep(3)
+            time.sleep(4)
 
             # الضغط على زر النشر
-            publish_btn = page.locator('button:has-text("نشر"), button:has-text("Publish")').first
+            print("🚀 الضغط على زر النشر...")
+            publish_btn = page.locator('div[aria-label="نشر"], div[aria-label="Publish"], button:has-text("نشر"), button:has-text("Publish")').first
+            publish_btn.scroll_into_view_if_needed()
             publish_btn.click()
-            print("⏳ تم النقر على زر النشر، جارٍ الانتظار لاكتمال المعالجة...")
-            time.sleep(10)
-            print("✅ تم النشر بنجاح على فيسبوك!")
+
+            # انتظار اكتمال الرفع والنشر
+            print("⏳ جارٍ الانتظار لاكتمال النشر...")
+            time.sleep(12)
+            print("🎉 تم النشر بنجاح على فيسبوك وإنستغرام عبر المتصفح!")
             browser.close()
             return True
 
         except Exception as e:
             print(f"❌ تعذر استكمال خطوات النشر داخل الصفحة: {e}")
+            page.screenshot(path="debug_composer_state.png")
             browser.close()
             return False
 
