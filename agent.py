@@ -1,178 +1,64 @@
 import os
-import json
-import random
-import math
 import requests
-from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
-# 1. قراءة المفاتيح السرية
-api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-tg_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
-tg_chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+# ==========================================
+# 1. دوال النشر والإرسال (Facebook & Telegram)
+# ==========================================
 
-topics = [
-    "3 أدوات ذكاء اصطناعي مجانية تضاعف إنتاجية رواد الأعمال",
-    "كيف تربط واتساب بجدول بيانات جوجل للرد التلقائي على العملاء",
-    "السر وراء كتابة أوامر (Prompts) احترافية تعطيك نتائج دقيقة من أول مرة",
-    "كيف توفر 15 ساعة أسبوعياً عبر أتمتة المهام المتكررة في مشروعك",
-    "لماذا تحتاج الشركات الناشئة إلى وكيل ذكاء اصطناعي (AI Agent)؟",
-    "كيف تحول خدمة العملاء في شركتك إلى نظام آلي يعمل 24 ساعة؟"
-]
-selected_topic = random.choice(topics)
-
-prompt = f"""أنت المدير الإبداعي لعلامة (مِداميك | MdaMiak) المتخصصة في الأتمتة، وكلاء الذكاء الاصطناعي، والحلول الرقمية.
-اكتب منشوراً احترافياً وجذاباً لفيسبوك وانستجرام حول: ({selected_topic}).
-أرجع النتيجة بصيغة JSON فقط تحتوي على مفتاحين:
-{{
-  "headline": "عنوان عربي قوي وخاطف للانتباه بدون تشكيل من 5 إلى 7 كلمات",
-  "caption": "نص المنشور الكامل بأسلوب شيق مع نقاط واضحة وسؤال تفاعلي في النهاية والهاشتاجات (أقل من 900 حرف)"
-}}"""
-
-print("1. جاري توليد المحتوى عبر Gemini...")
-data = None
-models = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.0-flash"]
-
-try:
-    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-    list_res = requests.get(list_url, timeout=10)
-    if list_res.status_code == 200:
-        for m in list_res.json().get("models", []):
-            if "generateContent" in m.get("supportedGenerationMethods", []):
-                m_name = m["name"].replace("models/", "")
-                if m_name not in models:
-                    models.append(m_name)
-except Exception:
-    pass
-
-for model_name in models:
+def post_to_facebook(page_id, access_token, image_path, caption):
+    """رفع الصورة والنص التسويقي مباشرة إلى صفحة فيسبوك عبر Meta Graph API"""
+    url = f"https://graph.facebook.com/v26.0/{page_id}/photos"
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json"}
-        }
-        res = requests.post(url, json=payload, timeout=20)
-        if res.status_code == 200:
-            raw_text = res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-            if "```" in raw_text:
-                raw_text = raw_text.split("```")[1]
-                if raw_text.lower().startswith("json"):
-                    raw_text = raw_text[4:]
-            start_idx = raw_text.find("{")
-            end_idx = raw_text.rfind("}") + 1
-            if start_idx != -1 and end_idx != 0:
-                data = json.loads(raw_text[start_idx:end_idx])
-                print(f"✅ نجح التوليد عبر نموذج: {model_name}")
-                break
+        with open(image_path, "rb") as img_file:
+            payload = {
+                "caption": caption,
+                "access_token": access_token
+            }
+            files = {
+                "source": img_file
+            }
+            response = requests.post(url, data=payload, files=files)
+            
+        result = response.json()
+        if response.status_code == 200 and "id" in result:
+            print(f"✅ تم النشر بنجاح على فيسبوك! معرف المنشور: {result['id']}")
+        else:
+            error_msg = result.get('error', {}).get('message', 'خطأ غير معروف')
+            print(f"❌ فشل النشر على فيسبوك: {error_msg}")
     except Exception as e:
-        print(f"⚠️ محاولة {model_name}: {e}")
+        print(f"❌ استثناء أثناء النشر على فيسبوك: {e}")
 
-if not data:
-    data = {
-        "headline": "أتمتة المهام: سلاحك السري لمضاعفة أرباحك",
-        "caption": "في مِداميك | MdaMiak نحول المهام اليومية المتكررة إلى أنظمة ذكية تعمل تلقائياً بدقة وسرعة.\n\n#مداميك #MdaMiak #ذكاء_اصطناعي"
-    }
+def send_to_telegram(bot_token, chat_id, image_path, caption):
+    """إرسال نسخة احتياطية من البطاقة والنص إلى بوت تيليجرام"""
+    url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
+    try:
+        with open(image_path, "rb") as img_file:
+            data = {"chat_id": chat_id, "caption": caption}
+            files = {"photo": img_file}
+            res = requests.post(url, data=data, files=files)
+        if res.status_code == 200:
+            print("✅ تم إرسال النسخة الاحتياطية إلى تيليجرام بنجاح.")
+        else:
+            print(f"⚠️ خطأ في إرسال تيليجرام: {res.text}")
+    except Exception as e:
+        print(f"❌ استثناء أثناء إرسال تيليجرام: {e}")
 
-headline = data.get("headline", "حلول الأتمتة الذكية من مداميك")
-caption = data.get("caption", "")
+# ==========================================
+# 2. الدالة الرئيسية (توليد، تصميم، ونشر)
+# ==========================================
 
-# 2. رسم البطاقة البصرية لعلامة MdaMiak
-print("2. جاري تصميم البطاقة البصرية...")
-W, H = 1080, 1080
-base = Image.new("RGB", (W, H), (6, 11, 24))
-draw_bg = ImageDraw.Draw(base)
+def main():
+    # 1. استدعاء المفاتيح من بيئة التشغيل (GitHub Secrets)
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    tg_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    tg_chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    fb_page_id = os.getenv("FB_PAGE_ID")
+    fb_page_token = os.getenv("FB_PAGE_TOKEN")
 
-cx, cy = W // 2, H // 2
-for r in range(520, 0, -4):
-    ratio = 1 - (r / 520)
-    red = int(6 + 8 * ratio)
-    green = int(14 + 65 * (ratio ** 1.5))
-    blue = int(30 + 115 * (ratio ** 1.5))
-    draw_bg.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(red, green, blue))
-
-overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-draw_ov = ImageDraw.Draw(overlay)
-
-for x in range(0, W, 90):
-    draw_ov.line([(x, 0), (x, H)], fill=(0, 210, 255, 14), width=1)
-for y in range(0, H, 90):
-    draw_ov.line([(0, y), (W, y)], fill=(0, 210, 255, 14), width=1)
-
-random.seed(len(headline) + random.randint(1, 10000))
-nodes = [(random.randint(100, 980), random.randint(100, 980)) for _ in range(18)]
-for i in range(len(nodes)):
-    for j in range(i + 1, len(nodes)):
-        dist = math.hypot(nodes[i][0] - nodes[j][0], nodes[i][1] - nodes[j][1])
-        if dist < 280:
-            draw_ov.line([nodes[i], nodes[j]], fill=(0, 210, 255, 35), width=2)
-
-for nx, ny in nodes:
-    draw_ov.ellipse([nx - 5, ny - 5, nx + 5, ny + 5], fill=(0, 225, 255, 95))
-
-final_img = Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB")
-draw = ImageDraw.Draw(final_img)
-
-# 3. تحميل الخط العربي (Tajawal Bold)
-font_url = "https://github.com/google/fonts/raw/main/ofl/tajawal/Tajawal-Bold.ttf"
-font_bytes = requests.get(font_url, timeout=15).content
-
-title_font = ImageFont.truetype(BytesIO(font_bytes), 64, layout_engine=ImageFont.Layout.RAQM)
-brand_font = ImageFont.truetype(BytesIO(font_bytes), 42, layout_engine=ImageFont.Layout.RAQM)
-footer_font = ImageFont.truetype(BytesIO(font_bytes), 30, layout_engine=ImageFont.Layout.RAQM)
-
-# 4. رسم الإطار والهوية البصرية
-draw.rectangle([(50, 50), (1030, 1030)], outline=(0, 210, 255), width=2)
-draw.rectangle([(62, 62), (1018, 1018)], outline=(0, 110, 160), width=1)
-
-draw.text((540, 130), "مداميك | MdaMiak", font=brand_font, fill=(0, 215, 255), anchor="mm", direction="rtl")
-draw.line([(370, 175), (710, 175)], fill=(0, 215, 255), width=3)
-
-words = headline.split()
-lines, current_line = [], []
-for word in words:
-    current_line.append(word)
-    if len(current_line) >= 3:
-        lines.append(" ".join(current_line))
-        current_line = []
-if current_line:
-    lines.append(" ".join(current_line))
-
-y_pos = 510 - (len(lines) * 45)
-for line in lines:
-    draw.text((540, y_pos), line, font=title_font, fill=(255, 255, 255), anchor="mm", direction="rtl")
-    y_pos += 105
-
-draw.line([(320, 910), (760, 910)], fill=(0, 110, 160), width=1)
-draw.text((540, 955), "نبني مستقبلك الرقمي بذكاء | @MdaMiak", font=footer_font, fill=(185, 205, 230), anchor="mm", direction="rtl")
-
-# 5. حفظ المخرجات
-os.makedirs("output", exist_ok=True)
-image_path = "output/post_image.jpg"
-final_img.save(image_path, quality=95)
-
-# 6. إرسال البطاقة والمنشور بتنسيق نظيف ومستقر 100%
-if tg_token and tg_chat_id:
-    print("3. جاري إرسال المنشور إلى تيليجرام...")
-    tg_url = f"https://api.telegram.org/bot{tg_token}/sendPhoto"
+    image_path = "output.png"
     
-    short_caption = caption[:1000] if len(caption) > 1000 else caption
-    full_text = f"🤖 منشور جديد جاهز للنشر (MdaMiak):\n\n{short_caption}\n\n🔗 [رابط تشغيل الوكيل اليدوي في جيثب](https://github.com/ZainSalman2/mdamiak-ai-agent/actions)"
-    
-    with open(image_path, "rb") as img_file:
-        tg_res = requests.post(
-            tg_url,
-            data={
-                "chat_id": tg_chat_id,
-                "caption": full_text,
-                "parse_mode": "Markdown"
-            },
-            files={"photo": img_file},
-            timeout=30
-        )
-    if tg_res.status_code == 200:
-        print("🚀 تم الإرسال بنجاح تام!")
-    else:
-        print(f"⚠️ فشل الإرسال: {tg_res.status_code} - {tg_res.text}")
-else:
-    print("⚠️ مفاتيح تيليجرام غير ممررة.")
+    # 2. توليد المحتوى والتصميم (تأكد من وجود الكود الخاص بك هنا لتوليد output.png و post_text)
+    # مثال للمحتوى النصي:
+    post_text = (
+        "
